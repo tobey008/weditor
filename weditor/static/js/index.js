@@ -177,7 +177,12 @@ new Vue({
       })
         .then(function (ret) {
           console.log(ret)
-          this.deviceId = ret.deviceId
+          if (ret.success){
+          this.deviceId = ret.deviceId;}
+          else {
+          alert(this.deviceUrl+"连接失败，请检查设备");
+          return
+          }
         }.bind(this))
         .fail(function (ret) {
           this.showAjaxError(ret);
@@ -408,6 +413,10 @@ new Vue({
       var self = this;
       this.loading = true;
       this.canvasStyle.opacity = 0.5;
+      if (this.deviceId === ''){
+      alert("无可用设备，请先连接手机")
+      this.loading = false
+      return}
       return this.screenRefresh()
         .fail(function (ret) {
           self.showAjaxError(ret);
