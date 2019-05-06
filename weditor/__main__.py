@@ -235,7 +235,10 @@ class _AndroidDevice(object):
     def __init__(self, device_url):
         import uiautomator2 as u2
         d = u2.connect(device_url)
-        self._d = d
+        if d.agent_alive:
+            self._d = d
+            return
+        raise Exception("设备连接失败...")
 
     def screenshot(self):
         return self._d.screenshot()
@@ -299,10 +302,10 @@ class DeviceConnectHandler(BaseHandler):
                 # d = neco.connect(device_url or 'localhost')
                 # cached_devices[id] = d
         except Exception as e:
-            self.set_status(430, "Connect Error")
+            #self.set_status(430, "Connect Error")
             self.write({
                 "success": False,
-                "description": traceback.format_exc().encode('utf-8'),
+                #"description": traceback.format_exc().encode('utf-8'),
             })
         else:
             self.write({
@@ -325,6 +328,26 @@ class DeviceHierarchyHandler(BaseHandler):
         # else:
         #     self.write("Unknown platform")
 
+class DeviceInitHandler(BaseHandler):
+    def get(self):
+        from os import popen
+        popen("adb start-server")
+        #todo: 获得命令行返回
+        r = popen("adb devices| awk 'NR==2{print $1}'")
+        serial = r.read()
+        print(serial)
+        if serial:
+            id = str(uuid.uuid4())
+            try:
+                print("开始初始化...")
+                popen("python3 -m uiautomator2 init --serial {}".format(serial))
+                cached_devices[id] = _AndroidDevice(serial)
+                self.write({"success":True,
+                            "deviceId":id})
+            except Exception:
+                self.write({"success":False})
+        else:
+            self.write({"success":False})
 
 class DeviceCodeDebugHandler(BaseHandler):
     def post(self, device_id):
@@ -369,6 +392,7 @@ def make_app(settings={}):
         (r"/api/v1/devices/([^/]+)/hierarchy", DeviceHierarchyHandler),
         (r"/api/v1/devices/([^/]+)/exec", DeviceCodeDebugHandler),
         (r"/ws/v1/build", BuildWSHandler),
+        (r"/api/v1/init",DeviceInitHandler)
     ], **settings)
     return application
 
@@ -450,7 +474,7 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     ap.add_argument('-q', '--quiet', action='store_true',
                     help='quite mode, no open new browser')
-    ap.add_argument('--debug', action='store_true',
+    ap.add_argument('--debug', action='store_true',default=True,
                     help='open debug mode')
     ap.add_argument('--shortcut', action='store_true',
                     help='create shortcut in desktop')

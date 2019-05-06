@@ -42,8 +42,12 @@
             <input type="text" v-model="serial" class="form-control" v-bind:placeholder="deviceUrl">
           </div>
           <button type="submit" class="btn btn-default" v-on:click="doConnect">
-            Connect
+            连接手机
             <span v-if="deviceId" class="glyphicon glyphicon-grain color-green"></span>
+          </button>
+          <button type="submit" class="btn btn-default" @click="doInit">
+            初始化本地设备
+            <!--<span v-if="deviceId" class="glyphicon glyphicon-grain color-green"></span>-->
           </button>
         </form>
       </div>

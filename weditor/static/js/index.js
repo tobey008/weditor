@@ -130,6 +130,21 @@ new Vue({
     // this.loadLiveScreen();
   },
   methods: {
+
+    doInit: function(){
+    console.log("helloe");
+    $.ajax({
+    url: LOCAL_URL + "api/v1/init",
+    type:"GET",
+
+    })
+    .done(function (ret){
+    if (ret.success){
+    this.deviceId = ret.deviceId;}
+    else
+    {alert("初始化设备失败");}
+    })},
+
     checkVersion: function () {
       var self = this;
       $.ajax({
