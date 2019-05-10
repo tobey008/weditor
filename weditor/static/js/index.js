@@ -5,6 +5,7 @@ window.LOCAL_VERSION = '0.0.3'
 new Vue({
   el: '#app',
   data: {
+    url:window.location.href,
     deviceId: '',
     console: {
       content: '',
@@ -22,7 +23,8 @@ new Vue({
     originNodes: [],
     autoCopy: true,
     platform: localStorage.platform || 'Android',
-    serial: localStorage.serial || '',
+    //serial: localStorage.serial || '',
+    serial:'',
     codeShortFlag: true, // generate short or long code
     imagePool: null,
     loading: false,
@@ -130,9 +132,17 @@ new Vue({
     // this.loadLiveScreen();
   },
   methods: {
+    //todo:iosUrl
+    iosUrl:function(){
+    var self = this;
+    self.deviceUrl = "http://localhost:8100";
+    },
 
+    //todo:初始化本地设备
     doInit: function(){
-    console.log("helloe");
+    console.log("hello");
+
+    var self = this
     $.ajax({
     url: LOCAL_URL + "api/v1/init",
     type:"GET",
@@ -140,9 +150,14 @@ new Vue({
     })
     .done(function (ret){
     if (ret.success){
-    this.deviceId = ret.deviceId;}
+    self.deviceId = ret.deviceId;
+    self.serial = ret.serial;
+    console.log(this.deviceId)}
     else
-    {alert("初始化设备失败");}
+    {  if (ret.serial === ""){
+        alert("未找到本地连接设备");}
+       else{alert(ret.serial+"初始化设备失败");}
+        }
     })},
 
     checkVersion: function () {
@@ -179,6 +194,7 @@ new Vue({
           self.loading = false;
         })
     },
+    //todo:连接手机
     doConnect: function () {
       var lastDeviceId = this.deviceId;
       this.deviceId = '';
@@ -424,11 +440,12 @@ new Vue({
     delayReload: function (msec) {
       setTimeout(this.screenDumpUI, msec || 1000);
     },
+    //todo:reaload
     screenDumpUI: function () {
       var self = this;
       this.loading = true;
       this.canvasStyle.opacity = 0.5;
-      if (this.deviceId === ''){
+      if (self.deviceId === ''){
       alert("无可用设备，请先连接手机")
       this.loading = false
       return}

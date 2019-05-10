@@ -285,7 +285,7 @@ class _GameDevice(object):
     def device(self):
         return self._d
 
-
+#todo:连接手机
 class DeviceConnectHandler(BaseHandler):
     def post(self):
         platform = self.get_argument("platform").lower()
@@ -328,26 +328,47 @@ class DeviceHierarchyHandler(BaseHandler):
         # else:
         #     self.write("Unknown platform")
 
+#todo:初始化本地设备和连接本地手机
 class DeviceInitHandler(BaseHandler):
     def get(self):
-        from os import popen
-        popen("adb start-server")
-        #todo: 获得命令行返回
-        r = popen("adb devices| awk 'NR==2{print $1}'")
-        serial = r.read()
-        print(serial)
-        if serial:
-            id = str(uuid.uuid4())
+        from uiautomator2.__main__ import _init_with_serial
+        from uiautomator2 import adbutils
+        from uiautomator2.version import __apk_version__,__atx_agent_version__
+        print("start...")
+        devices = adbutils.devices()
+        if not devices:
+            self.write({
+                "success":False,
+                "serial": "",
+                "deviceId": "",
+
+            })
+            return
+        for d in devices:
+            serial = d.get_serial_no()
+            if d.get_state() != 'device':
+                print("Skip invalid device: %s %s", serial,
+                               d.get_state())
+                continue
+            print("Init device %s", serial)
+            #todo:初始化代码优化
             try:
-                print("开始初始化...")
-                popen("python3 -m uiautomator2 init --serial {}".format(serial))
-                cached_devices[id] = _AndroidDevice(serial)
-                self.write({"success":True,
-                            "deviceId":id})
-            except Exception:
-                self.write({"success":False})
-        else:
-            self.write({"success":False})
+                d = _AndroidDevice(serial)
+            except:
+                _init_with_serial(serial=serial, apk_version=__apk_version__, agent_version=__atx_agent_version__,
+                                  server=None, reinstall=False)
+                d = _AndroidDevice(serial)
+            id = str(uuid.uuid4())
+            cached_devices[id] = d
+            self.write({
+                "success":True,
+                "serial":serial,
+                "deviceId":id,
+
+            })
+            return
+
+
 
 class DeviceCodeDebugHandler(BaseHandler):
     def post(self, device_id):

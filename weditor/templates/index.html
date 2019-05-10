@@ -26,7 +26,7 @@
           <span class="icon-bar"></span>
           <span class="icon-bar"></span>
         </button>
-        <a class="navbar-brand" href="#">WEditor</a>
+        <a class="navbar-brand" :href="url" target="_blank" >WEditor</a>
       </div>
       <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
         <!--         <ul class="nav navbar-nav">
@@ -36,18 +36,18 @@
           <div class="form-group">
             <select v-model="platform" class="selectpicker" value="Android" title="Platform" data-width="fit">
               <option data-icon="glyphicon-piggy-bank" value="Android">Android</option>
-              <option data-icon="glyphicon-apple" value="iOS">iOS</option>
+              <option data-icon="glyphicon-apple" value="iOS" @click="iosUrl">iOS</option>
               <option data-icon="glyphicon-apple" value="Neco">Neco(beta)</option>
             </select>
             <input type="text" v-model="serial" class="form-control" v-bind:placeholder="deviceUrl">
           </div>
-          <button type="submit" class="btn btn-default" v-on:click="doConnect">
+          <button type="submit" class="btn btn-default" @click="doConnect">
             连接手机
             <span v-if="deviceId" class="glyphicon glyphicon-grain color-green"></span>
           </button>
           <button type="submit" class="btn btn-default" @click="doInit">
             初始化本地设备
-            <!--<span v-if="deviceId" class="glyphicon glyphicon-grain color-green"></span>-->
+            <span v-if="deviceId" class="glyphicon glyphicon-grain color-green"></span>
           </button>
         </form>
       </div>
