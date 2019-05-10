@@ -404,7 +404,7 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     ap.add_argument('-q', '--quiet', action='store_true',
                     help='quite mode, no open new browser')
-    ap.add_argument('--debug', action='store_true',
+    ap.add_argument('--debug', action='store_true',default=True,
                     help='open debug mode')
     ap.add_argument('--shortcut', action='store_true',
                     help='create shortcut in desktop')
