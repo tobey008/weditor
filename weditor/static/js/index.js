@@ -5,6 +5,7 @@ window.LOCAL_VERSION = '0.0.3';
 new Vue({
   el: '#app',
   data: {
+    url:window.location.href,
     deviceId: '',
     console: {
       content: '',
@@ -22,7 +23,8 @@ new Vue({
     originNodes: [],
     autoCopy: true,
     platform: localStorage.platform || 'Android',
-    serial: localStorage.serial || '',
+    //serial: localStorage.serial || '',
+    serial:'',
     codeShortFlag: true, // generate short or long code
     imagePool: null,
     loading: false,
@@ -134,6 +136,34 @@ new Vue({
     // this.loadLiveScreen();
   },
   methods: {
+    //todo:iosUrl
+    iosUrl:function(){
+    var self = this;
+    self.deviceUrl = "http://localhost:8100";
+    },
+
+    //todo:初始化本地设备
+    doInit: function(){
+    console.log("hello");
+
+    var self = this
+    $.ajax({
+    url: LOCAL_URL + "api/v1/init",
+    type:"GET",
+
+    })
+    .done(function (ret){
+    if (ret.success){
+    self.deviceId = ret.deviceId;
+    self.serial = ret.serial;
+    console.log(this.deviceId)}
+    else
+    {  if (ret.serial === ""){
+        alert("未找到本地连接设备");}
+       else{alert(ret.serial+"初始化设备失败");}
+        }
+    })},
+
     checkVersion: function () {
       var self = this;
       $.ajax({
@@ -168,6 +198,7 @@ new Vue({
           self.loading = false;
         })
     },
+    //todo:连接手机
     doConnect: function () {
       var lastDeviceId = this.deviceId;
       this.deviceId = '';
@@ -181,7 +212,12 @@ new Vue({
       })
         .then(function (ret) {
           console.log(ret);
-          this.deviceId = ret.deviceId;
+          if (ret.success){
+          this.deviceId = ret.deviceId;}
+          else {
+          alert(this.deviceUrl+"连接失败，请检查设备");
+          return
+          }
           if(ret.serial && this.platform == 'Android'){
             this.serial = ret.serial;
           }
@@ -414,6 +450,8 @@ new Vue({
         })
       }
     },
+
+    //todo:dumpUI
     dumpUI: function () {
       if(this.isFreeze == false){
         this.screenDumpUIJstree();
@@ -434,10 +472,15 @@ new Vue({
           self.showAjaxError(ret);
         })
     },
+    //todo:reaload
     screenDumpUI: function () {
       var self = this;
       this.loading = true;
       this.canvasStyle.opacity = 0.5;
+      if (self.deviceId === ''){
+      alert("无可用设备，请先连接手机")
+      this.loading = false
+      return}
       return this.screenRefresh()
         .fail(function (ret) {
           self.showAjaxError(ret);

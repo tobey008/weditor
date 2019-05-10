@@ -231,6 +231,61 @@ class BuildWSHandler(tornado.websocket.WebSocketHandler):
         print("Websocket closed")
 
 
+class _AndroidDevice(object):
+    def __init__(self, device_url):
+        import uiautomator2 as u2
+        d = u2.connect(device_url)
+        if d.agent_alive:
+            self._d = d
+            return
+        raise Exception("设备连接失败...")
+
+    def screenshot(self):
+        return self._d.screenshot()
+
+    def dump_hierarchy(self):
+        return uidumplib.get_android_hierarchy(self._d)
+
+    @property
+    def device(self):
+        return self._d
+
+
+class _AppleDevice(object):
+    def __init__(self, device_url):
+        import wda
+        c = wda.Client(device_url)
+        self._client = c
+        self.__scale = c.session().scale
+
+    def screenshot(self):
+        return self._client.screenshot(format='pillow')
+
+    def dump_hierarchy(self):
+        return uidumplib.get_ios_hierarchy(self._client, self.__scale)
+
+    @property
+    def device(self):
+        return self._client
+
+
+class _GameDevice(object):
+    def __init__(self, device_url):
+        import neco
+        d = neco.connect(device_url)
+        self._d = d
+
+    def screenshot(self):
+        return self._d.screenshot()
+
+    def dump_hierarchy(self):
+        return self._d.dump_hierarchy()
+
+    @property
+    def device(self):
+        return self._d
+
+#todo:连接手机
 class DeviceConnectHandler(BaseHandler):
     def post(self):
         platform = self.get_argument("platform").lower()
@@ -245,18 +300,17 @@ class DeviceConnectHandler(BaseHandler):
                 cached_devices[id] = d
                 serial = d._host + ":" + str(d._port)
             elif platform == 'ios':
-                import atx
-                d = atx.connect(device_url)
-                cached_devices[id] = d
+                cached_devices[id] = _AppleDevice(device_url)
             else:
-                import neco
-                d = neco.connect(device_url or 'localhost')
-                cached_devices[id] = d
+                cached_devices[id] = _GameDevice(device_url or "localhost")
+                # import neco
+                # d = neco.connect(device_url or 'localhost')
+                # cached_devices[id] = d
         except Exception as e:
-            self.set_status(430, "Connect Error")
+            #self.set_status(430, "Connect Error")
             self.write({
                 "success": False,
-                "description": traceback.format_exc().encode('utf-8'),
+                #"description": traceback.format_exc().encode('utf-8'),
             })
         else:
             self.write({
@@ -269,20 +323,64 @@ class DeviceConnectHandler(BaseHandler):
 class DeviceHierarchyHandler(BaseHandler):
     def get(self, device_id):
         d = get_device(device_id)
-        if d.platform == 'ios':
-            self.write(uidumplib.get_ios_hierarchy(d))
-        elif d.platform == 'android':
-            self.write(uidumplib.get_android_hierarchy(d))
-        elif d.platform == 'neco':
-            dump = d.dump_hierarchy()
-            self.write(dump)
-        else:
-            self.write("Unknown platform")
+        self.write(d.dump_hierarchy())
+        # if d.platform == 'ios':
+        #     self.write(uidumplib.get_ios_hierarchy(d))
+        # elif d.platform == 'android':
+        #     self.write(uidumplib.get_android_hierarchy(d))
+        # elif d.platform == 'neco':
+        #     dump = d.dump_hierarchy()
+        #     self.write(dump)
+        # else:
+        #     self.write("Unknown platform")
+
+#todo:初始化本地设备和连接本地手机
+class DeviceInitHandler(BaseHandler):
+    def get(self):
+        from uiautomator2.__main__ import _init_with_serial
+        from uiautomator2 import adbutils
+        from uiautomator2.version import __apk_version__,__atx_agent_version__
+        print("start...")
+        devices = adbutils.devices()
+        if not devices:
+            self.write({
+                "success":False,
+                "serial": "",
+                "deviceId": "",
+
+            })
+            return
+        for d in devices:
+            serial = d.get_serial_no()
+            if d.get_state() != 'device':
+                print("Skip invalid device: %s %s", serial,
+                               d.get_state())
+                continue
+            print("Init device %s", serial)
+            #todo:初始化代码优化
+            try:
+                device = _AndroidDevice(serial)
+
+            except:
+                _init_with_serial(serial=serial, apk_version=__apk_version__, agent_version=__atx_agent_version__,
+                                  server=None, reinstall=False)
+                device = _AndroidDevice(serial)
+            # serial = device._d.wlan_ip + ":7912"
+            id = str(uuid.uuid4())
+            cached_devices[id] = d
+            self.write({
+                "success":True,
+                "serial":serial,
+                "deviceId":id,
+
+            })
+            return
+
 
 
 class DeviceCodeDebugHandler(BaseHandler):
-    def post(self, device_id):
-        d = get_device(device_id)
+    def post(self, id):
+        d = cached_devices.get(id)
         code = self.get_argument('code')
         start = time.time()
         buffer = BytesIO()
@@ -290,7 +388,6 @@ class DeviceCodeDebugHandler(BaseHandler):
         sys.stderr = buffer
 
         is_eval = True
-        compiled_code = None
         try:
             compiled_code = compile(code, "<string>", "eval")
         except SyntaxError:
@@ -313,7 +410,7 @@ class DeviceCodeDebugHandler(BaseHandler):
             "content": buffer.getvalue().decode('utf-8'),
         })
 
-
+#todo:url
 def make_app(settings={}):
     application = tornado.web.Application([
         (r"/", MainHandler),
@@ -323,6 +420,7 @@ def make_app(settings={}):
         (r"/api/v1/devices/([^/]+)/hierarchy", DeviceHierarchyHandler),
         (r"/api/v1/devices/([^/]+)/exec", DeviceCodeDebugHandler),
         (r"/ws/v1/build", BuildWSHandler),
+        (r"/api/v1/init",DeviceInitHandler)
     ], **settings)
     return application
 
@@ -426,3 +524,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+#todo: home back功能失效
+#todo: 初始化本地设备后仍需连接手机
+#todo: reload按钮
+#todo: 清除元素布局显示
