@@ -23,8 +23,8 @@ new Vue({
     originNodes: [],
     autoCopy: true,
     platform: localStorage.platform || 'Android',
-    //serial: localStorage.serial || '',
-    serial:'',
+    serial: localStorage.serial || '',
+//    serial:'',
     codeShortFlag: true, // generate short or long code
     imagePool: null,
     loading: false,
@@ -558,6 +558,7 @@ new Vue({
       img.src = url;
       return dtd;
     },
+    //todo:实时同屏
     loadLiveScreen: function () {
       var self = this;
       var BLANK_IMG =

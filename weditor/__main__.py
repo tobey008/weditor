@@ -129,10 +129,10 @@ class VersionHandler(BaseHandler):
 
 
 class DeviceScreenshotHandler(BaseHandler):
-    def get(self, serial):
-        print("SN", serial)
+    def get(self, id):
+        print("SN", id)
         try:
-            d = get_device(serial)
+            d = cached_devices.get(id)
             buffer = BytesIO()
             d.screenshot().convert("RGB").save(buffer, format='JPEG')
             b64data = base64.b64encode(buffer.getvalue())
@@ -294,11 +294,10 @@ class DeviceConnectHandler(BaseHandler):
         serial = ""
         try:
             if platform == 'android':
-                import uiautomator2 as u2
-                d = u2.connect(device_url)
+                d = _AndroidDevice(device_url)
                 d.platform = 'android'
                 cached_devices[id] = d
-                serial = d._host + ":" + str(d._port)
+                serial = d._d._host + ":" + str(d._d._port)
             elif platform == 'ios':
                 cached_devices[id] = _AppleDevice(device_url)
             else:
@@ -308,6 +307,7 @@ class DeviceConnectHandler(BaseHandler):
                 # cached_devices[id] = d
         except Exception as e:
             #self.set_status(430, "Connect Error")
+            print(e)
             self.write({
                 "success": False,
                 #"description": traceback.format_exc().encode('utf-8'),
@@ -367,7 +367,7 @@ class DeviceInitHandler(BaseHandler):
                 device = _AndroidDevice(serial)
             # serial = device._d.wlan_ip + ":7912"
             id = str(uuid.uuid4())
-            cached_devices[id] = d
+            cached_devices[id] = device
             self.write({
                 "success":True,
                 "serial":serial,
@@ -395,10 +395,10 @@ class DeviceCodeDebugHandler(BaseHandler):
             compiled_code = compile(code, "<string>", "exec")
         try:
             if is_eval:
-                ret = eval(code, {'d': d})
+                ret = eval(code, {'d': d._d})
                 buffer.write((">>> " + repr(ret) + "\n").encode('utf-8'))
             else:
-                exec(compiled_code, {'d': d})
+                exec(compiled_code, {'d': d._d})
         except:
             buffer.write(traceback.format_exc().encode('utf-8'))
         finally:
@@ -524,7 +524,8 @@ def main():
 
 if __name__ == '__main__':
     main()
-#todo: home back功能失效
+#todo: home back功能失效<done>
 #todo: 初始化本地设备后仍需连接手机
 #todo: reload按钮
 #todo: 清除元素布局显示
+#todo:ctl工具
