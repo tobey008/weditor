@@ -461,6 +461,7 @@ new Vue({
         })
         .then(function (source) {
           localStorage.setItem('windowHierarchy', JSON.stringify(source));
+          //todo:绘制元素布局图
           self.drawAllNodeFromSource(source);
         })
     },
