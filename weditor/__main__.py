@@ -291,13 +291,14 @@ class DeviceConnectHandler(BaseHandler):
         platform = self.get_argument("platform").lower()
         device_url = self.get_argument("deviceUrl")
         id = str(uuid.uuid4())
-        serial = ""
+        socket_url = ""
         try:
             if platform == 'android':
                 d = _AndroidDevice(device_url)
+                print(d)
                 d.platform = 'android'
                 cached_devices[id] = d
-                serial = d._d._host + ":" + str(d._d._port)
+                socket_url = d._d._host + ":" + str(d._d._port)
             elif platform == 'ios':
                 cached_devices[id] = _AppleDevice(device_url)
             else:
@@ -316,7 +317,7 @@ class DeviceConnectHandler(BaseHandler):
             self.write({
                 "deviceId": id,
                 'success': True,
-                "serial": serial,
+                "socket_url": socket_url,
             })
 
 
@@ -368,10 +369,12 @@ class DeviceInitHandler(BaseHandler):
             # serial = device._d.wlan_ip + ":7912"
             id = str(uuid.uuid4())
             cached_devices[id] = device
+            socket_url = device._d._host + ":"+ str(device._d._port)
             self.write({
                 "success":True,
                 "serial":serial,
                 "deviceId":id,
+                "socket_url":socket_url
 
             })
             return

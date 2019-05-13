@@ -5,6 +5,8 @@ window.LOCAL_VERSION = '0.0.3';
 new Vue({
   el: '#app',
   data: {
+    test:true,
+    socket_url:'',
     url:window.location.href,
     deviceId: '',
     console: {
@@ -156,13 +158,22 @@ new Vue({
     if (ret.success){
     self.deviceId = ret.deviceId;
     self.serial = ret.serial;
+    if(ret.socket_url && this.platform == 'Android'){
+            this.socket_url = ret.socket_url;
+            this.activeRemoteMouseControl();
+            this.loadLiveScreen();
+          }
+          if(this.platform == 'iOS'){
+            this.isFreeze = true;
+          }
+
     console.log(this.deviceId)}
     else
     {  if (ret.serial === ""){
         alert("未找到本地连接设备");}
        else{alert(ret.serial+"初始化设备失败");}
         }
-    })},
+    }.bind(this))},//todo:bind(this)
 
     checkVersion: function () {
       var self = this;
@@ -218,8 +229,8 @@ new Vue({
           alert(this.deviceUrl+"连接失败，请检查设备");
           return
           }
-          if(ret.serial && this.platform == 'Android'){
-            this.serial = ret.serial;
+          if(ret.socket_url && this.platform == 'Android'){
+            this.socket_url = ret.socket_url;
           }
           if(this.platform == 'iOS'){
             this.isFreeze = true;
@@ -481,6 +492,10 @@ new Vue({
       alert("无可用设备，请先连接手机")
       this.loading = false
       return}
+      if(this.isFreeze){
+        this.activeRemoteMouseControl();
+        this.loadLiveScreen();
+        this.isFreeze = false;}
       return this.screenRefresh()
         .fail(function (ret) {
           self.showAjaxError(ret);
@@ -567,9 +582,9 @@ new Vue({
 
       var port = "7912";
       if(this.platform == 'Android'){
-          port = this.serial.split(":")[1] ? this.serial.split(":")[1] : "7912";
+          port = this.socket_url.split(":")[1] ? this.socket_url.split(":")[1] : "7912";
       }
-      var ip = this.serial.split(":")[0];
+      var ip = this.socket_url.split(":")[0];
       var ws = this.ws = new WebSocket('ws://' + ip + ':' + port + '/minicap');
 
       var canvas = document.getElementById('bgCanvas');
@@ -634,6 +649,8 @@ new Vue({
         console.log("screen websocket closed")
       }
     },
+
+    //todo:freeze
     freezeHandler: function(){
       if(this.wsControl == null || this.platform == 'iOS'){
         this.screenDumpUI();
@@ -743,6 +760,8 @@ new Vue({
           return this.codeInsert(code);
         }.bind(this))
     },
+
+    //todo:点击，loading=false，screenshot
     doTap: function (node) {
       var self = this;
       var code = this.generateNodeSelectorCode(node);
@@ -757,7 +776,9 @@ new Vue({
         // })
         .fail(function () {
           self.loading = false;
-        })
+        }).done(function(){
+        self.loading = false})
+      this.screenDumpUI()
     },
     doPositionTap: function (x, y) {
       var code = 'd.click(' + x + ', ' + y + ')'
@@ -905,6 +926,8 @@ new Vue({
       });
       self.drawNode(self.nodeHovered, "blue");
     },
+
+    //todo:远程控制00000
     activeLocalUIMouseControl: function () {
       var self = this;
       var element = this.canvas.fg;
@@ -1062,6 +1085,8 @@ new Vue({
       element.addEventListener('mousedown', mouseDownListener);
       element.addEventListener('mousemove', mouseHoverListener);
     },
+
+    //todo：远程控制
     activeRemoteMouseControl: function () {
       /**
        * TOUCH HANDLING
@@ -1075,9 +1100,9 @@ new Vue({
 
       var port = "7912";
       if(this.platform == 'Android'){
-          port = this.serial.split(":")[1] ? this.serial.split(":")[1] : "7912";
+          port = this.socket_url.split(":")[1] ? this.socket_url.split(":")[1] : "7912";
       }
-      var ip = this.serial.split(":")[0];
+      var ip = this.socket_url.split(":")[0];
       var ws = this.wsControl = new WebSocket('ws://' + ip + ':' + port + '/minitouch');
       ws.onerror = function (ev) {
         console.log("minitouch websocket error:", ev)
