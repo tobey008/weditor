@@ -3,10 +3,32 @@ window.LOCAL_VERSION = '0.0.3';
 
 
 new Vue({
+    el:'#devices',
+    data:{
+        devices:[],
+    },
+    method:{
+    checkDevices:function(){
+        var self = this
+        $.ajax({
+            url: LOCAL_URL + "api/v1/check",
+            type:"GET",
+
+                }).done(function(ret){
+                    self.devices = ret.devices
+                    console.log(self.devices)
+                                    })}
+
+    },
+
+    });
+
+new Vue({
   el: '#app',
   data: {
     test:true,
     socket_url:'',
+    devices:[],
     url:window.location.href,
     deviceId: '',
     console: {
@@ -483,7 +505,7 @@ new Vue({
           self.showAjaxError(ret);
         })
     },
-    //todo:reaload
+    //todo:动态解析
     screenDumpUI: function () {
       var self = this;
       this.loading = true;
@@ -650,7 +672,7 @@ new Vue({
       }
     },
 
-    //todo:freeze
+    //todo:静态解析
     freezeHandler: function(){
       if(this.wsControl == null || this.platform == 'iOS'){
         this.screenDumpUI();

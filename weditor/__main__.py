@@ -413,6 +413,15 @@ class DeviceCodeDebugHandler(BaseHandler):
             "content": buffer.getvalue().decode('utf-8'),
         })
 
+class DeviceCheckHandler(BaseHandler):
+    def get(self):
+        from uiautomator2 import adbutils
+        devices = adbutils.devices()
+        if devices:
+            self.write({
+                "devices":[device.get_serial_no()   for device in devices],
+            })
+
 #todo:url
 def make_app(settings={}):
     application = tornado.web.Application([
@@ -423,7 +432,8 @@ def make_app(settings={}):
         (r"/api/v1/devices/([^/]+)/hierarchy", DeviceHierarchyHandler),
         (r"/api/v1/devices/([^/]+)/exec", DeviceCodeDebugHandler),
         (r"/ws/v1/build", BuildWSHandler),
-        (r"/api/v1/init",DeviceInitHandler)
+        (r"/api/v1/init",DeviceInitHandler),
+        (r"/api/v1/check", DeviceCheckHandler)
     ], **settings)
     return application
 
