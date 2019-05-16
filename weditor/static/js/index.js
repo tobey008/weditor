@@ -160,11 +160,17 @@ new Vue({
     // this.loadLiveScreen();
   },
   methods: {
-    //todo:iosUrl
-    iosUrl:function(){
-    var self = this;
-    self.deviceUrl = "http://localhost:8100";
-    },
+  //todo:检查本地设备
+   checkDevices:function(){
+        var self = this
+        $.ajax({
+            url: LOCAL_URL + "api/v1/check",
+            type:"GET",
+
+                }).done(function(ret){
+                    self.devices = ret.devices
+                    console.log(self.devices)
+                                    })},
 
     //todo:初始化本地设备
     doInit: function(){

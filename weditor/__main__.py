@@ -65,16 +65,6 @@ def tostr(s, encoding='utf-8'):
     return s
 
 
-def get_device(id):
-    return cached_devices.get(id)
-    # return atx.connect(None if serial in ['-', 'default'] else serial)
-    # d = __devices.get(serial)
-    # if d:
-    #     return d
-    # __devices[serial] = atx.connect(None if serial == 'default' else serial)
-    # return __devices.get(serial)
-
-
 def read_file_content(filename, default=''):
     if not os.path.isfile(filename):
         return default
@@ -255,6 +245,7 @@ class _AppleDevice(object):
     def __init__(self, device_url):
         import wda
         c = wda.Client(device_url)
+
         self._client = c
         self.__scale = c.session().scale
 
@@ -322,27 +313,22 @@ class DeviceConnectHandler(BaseHandler):
 
 
 class DeviceHierarchyHandler(BaseHandler):
-    def get(self, device_id):
-        d = get_device(device_id)
+    def get(self, id):
+        d = cached_devices.get(id)
         self.write(d.dump_hierarchy())
-        # if d.platform == 'ios':
-        #     self.write(uidumplib.get_ios_hierarchy(d))
-        # elif d.platform == 'android':
-        #     self.write(uidumplib.get_android_hierarchy(d))
-        # elif d.platform == 'neco':
-        #     dump = d.dump_hierarchy()
-        #     self.write(dump)
-        # else:
-        #     self.write("Unknown platform")
+
 
 #todo:初始化本地设备和连接本地手机
 class DeviceInitHandler(BaseHandler):
     def get(self):
         from uiautomator2.__main__ import _init_with_serial
-        from uiautomator2 import adbutils
         from uiautomator2.version import __apk_version__,__atx_agent_version__
         print("start...")
-        devices = adbutils.devices()
+        from adb.client import Client as AdbClient
+        client = AdbClient()
+        devices = client.devices()
+        for d in devices:
+            print(d.serial)
         if not devices:
             self.write({
                 "success":False,
@@ -415,8 +401,9 @@ class DeviceCodeDebugHandler(BaseHandler):
 
 class DeviceCheckHandler(BaseHandler):
     def get(self):
-        from uiautomator2 import adbutils
-        devices = adbutils.devices()
+        from adb.client import Client as AdbClient
+        client = AdbClient()
+        devices = client.devices()
         if devices:
             self.write({
                 "devices":[device.get_serial_no()   for device in devices],

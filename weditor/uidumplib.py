@@ -145,3 +145,11 @@ def get_ios_hierarchy(d, scale):
         return node
 
     return travel(sourcejson)
+
+if __name__ == '__main__':
+    from  uiautomator2 import connect
+    d = connect('CAIZVKOR4TFQQ4QC')
+    page = get_android_hierarchy(d)
+    from pprint import pprint
+    pprint(page)
+

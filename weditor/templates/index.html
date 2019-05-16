@@ -36,7 +36,7 @@
           <div class="form-group">
             <select v-model="platform" class="selectpicker" value="Android" title="Platform" data-width="fit">
               <option data-icon="glyphicon-piggy-bank" value="Android">Android</option>
-              <option data-icon="glyphicon-apple" value="iOS" @click="iosUrl">iOS</option>
+              <option data-icon="glyphicon-apple" value="iOS" >iOS</option>
               <option data-icon="glyphicon-apple" value="Neco">Neco(beta)</option>
             </select>
             <input type="text" v-model="serial" class="form-control" v-bind:placeholder="deviceUrl">
@@ -46,18 +46,14 @@
             <span v-if="deviceId" class="glyphicon glyphicon-grain color-green"></span>
           </button>
 
-
-          <div class="form-group" id="devices">
-            <select  class="selectpicker" value="Android" title="Platform" data-width="fit" @click="checkDevices">
-              <option data-icon="glyphicon-piggy-bank" value="Android" @click="checkDevices">本地设备</option>
-              <option data-icon="glyphicon-piggy-bank" value="iOS" >iOS</option>
-              <option data-icon="glyphicon-apple" value="Neco">Neco(beta)</option>
-            </select>
-          </div>
-          <button type="submit" class="btn btn-default" @click="doInit">
-            初始化本地设备
-            <span v-if="deviceId" class="glyphicon glyphicon-grain color-green"></span>
-          </button>
+           <button type="submit" class="btn btn-default dropdown" @click="checkDevices">
+          <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">本地设备 <span class="caret"></span></a>
+          <ul class="dropdown-menu" v-for="device in devices">
+            <li><a href="#" @click="doInit"><span v-text="device"></span></a></li>
+            <li role="separator" class="divider"></li>
+            <!--<li><a href="#">Separated link</a></li>-->
+          </ul>
+        </button>
         </form>
       </div>
     </nav>
