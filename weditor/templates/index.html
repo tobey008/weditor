@@ -49,7 +49,8 @@
            <button type="submit" class="btn btn-default dropdown" @click="checkDevices">
           <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">本地设备 <span class="caret"></span></a>
           <ul class="dropdown-menu" v-for="device in devices">
-            <li><a href="#" @click="doInit"><span v-text="device"></span></a></li>
+            <li><a href="#" v-if="no_devices">无可用设备</a></li>
+            <li><a href="#" @click="doInit"><span v-text="device.serial"></span>&nbsp; &nbsp; <span v-text="device.status"></span></a></li>
             <li role="separator" class="divider"></li>
             <!--<li><a href="#">Separated link</a></li>-->
           </ul>
@@ -88,7 +89,7 @@
           <div class="panel-heading">
             <i class="fa fa-empire" aria-hidden="true"></i> Selected Element
             <span class="pull-right">
-              <button :disabled="loading" class="button button-primary button-tiny button-rounded" v-on:click="screenDumpUI()">
+              <button :disabled="loading && emulator " class="button button-primary button-tiny button-rounded" v-on:click="screenDumpUI()" >
                 <i class="fa fa-refresh"></i> 动态解析
               </button>
               <button :disabled="loading" class="button button-primary button-tiny button-rounded" v-on:click="freezeHandler()">

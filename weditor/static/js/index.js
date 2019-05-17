@@ -2,31 +2,13 @@ window.LOCAL_URL = '/'; // http://localhost:17310/';
 window.LOCAL_VERSION = '0.0.3';
 
 
-new Vue({
-    el:'#devices',
-    data:{
-        devices:[],
-    },
-    method:{
-    checkDevices:function(){
-        var self = this
-        $.ajax({
-            url: LOCAL_URL + "api/v1/check",
-            type:"GET",
-
-                }).done(function(ret){
-                    self.devices = ret.devices
-                    console.log(self.devices)
-                                    })}
-
-    },
-
-    });
 
 new Vue({
   el: '#app',
   data: {
     test:true,
+    no_devices:false,
+    emulator:false,
     socket_url:'',
     devices:[],
     url:window.location.href,
@@ -168,9 +150,15 @@ new Vue({
             type:"GET",
 
                 }).done(function(ret){
-                    self.devices = ret.devices
+                if (ret.success){
+                    self.no_devices = false,
+                    self.devices = ret.devices,
                     console.log(self.devices)
-                                    })},
+                                    }
+                else{
+                  self.no_devices = true;
+                  console.log("无可用设备")}}.bind(this))
+                },
 
     //todo:初始化本地设备
     doInit: function(){
