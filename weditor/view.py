@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from pprint import pprint as print
 import sys
 import platform
 import time
@@ -216,9 +215,8 @@ class _GameDevice(object):
     def device(self):
         return self._d
 
+
 # todo:连接手机
-
-
 class DeviceConnectHandler(BaseHandler):
     def post(self):
         platform = self.get_argument("platform").lower()

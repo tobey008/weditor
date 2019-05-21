@@ -100,7 +100,6 @@ def main(args):
         create_shortcut()
         return
     if not args.quiet:
-        # webbrowser.open(url, new=2)
         webbrowser.open('http://localhost:' + str(args.port), new=2)
     application = make_app(args.debug)
     print('listen port', args.port)
