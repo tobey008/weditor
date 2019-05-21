@@ -1,10 +1,16 @@
 window.LOCAL_URL = '/'; // http://localhost:17310/';
-window.LOCAL_VERSION = '0.0.3'
+window.LOCAL_VERSION = '0.0.3';
+
 
 
 new Vue({
   el: '#app',
   data: {
+    test:true,
+    no_devices:false,
+    emulator:false,
+    socket_url:'',
+    devices:[],
     url:window.location.href,
     deviceId: '',
     console: {
@@ -23,8 +29,8 @@ new Vue({
     originNodes: [],
     autoCopy: true,
     platform: localStorage.platform || 'Android',
-    //serial: localStorage.serial || '',
-    serial:'',
+    serial: localStorage.serial || '',
+//    serial:'',
     codeShortFlag: true, // generate short or long code
     imagePool: null,
     loading: false,
@@ -44,6 +50,10 @@ new Vue({
         height: 1
       }
     },
+    ws: null,
+    wsControl:null,
+    rotation: null,
+    isFreeze: false
   },
   watch: {
     platform: function (newval) {
@@ -97,15 +107,15 @@ new Vue({
     var currentSize = null;
     var self = this;
 
-    this.canvas.bg = document.getElementById('bgCanvas')
-    this.canvas.fg = document.getElementById('fgCanvas')
+    this.canvas.bg = document.getElementById('bgCanvas');
+    this.canvas.fg = document.getElementById('fgCanvas');
     // this.canvas = c;
     window.c = this.canvas.bg;
-    var ctx = c.getContext('2d')
+    var ctx = c.getContext('2d');
 
     $(window).resize(function () {
       self.resizeScreen();
-    })
+    });
 
     // initial select platform
     $('.selectpicker').selectpicker('val', this.platform);
@@ -113,12 +123,12 @@ new Vue({
     this.initJstree();
 
     var editor = this.editor = ace.edit("editor");
-    editor.resize()
+    editor.resize();
     window.editor = editor;
     this.initEditor(editor);
     this.initDragDealer();
 
-    this.activeMouseControl();
+    this.activeLocalUIMouseControl();
 
     function setError(msg) {
       self.error = msg;
@@ -126,17 +136,29 @@ new Vue({
     }
 
     this.loading = true;
-    this.checkVersion()
+    this.checkVersion();
 
     // this.screenRefresh()
     // this.loadLiveScreen();
   },
   methods: {
-    //todo:iosUrl
-    iosUrl:function(){
-    var self = this;
-    self.deviceUrl = "http://localhost:8100";
-    },
+  //todo:检查本地设备
+   checkDevices:function(){
+        var self = this
+        $.ajax({
+            url: LOCAL_URL + "api/v1/check",
+            type:"GET",
+
+                }).done(function(ret){
+                if (ret.success){
+                    self.no_devices = false,
+                    self.devices = ret.devices,
+                    console.log(self.devices)
+                                    }
+                else{
+                  self.no_devices = true;
+                  console.log("无可用设备")}}.bind(this))
+                },
 
     //todo:初始化本地设备
     doInit: function(){
@@ -152,13 +174,22 @@ new Vue({
     if (ret.success){
     self.deviceId = ret.deviceId;
     self.serial = ret.serial;
+    if(ret.socket_url && this.platform == 'Android'){
+            this.socket_url = ret.socket_url;
+            this.activeRemoteMouseControl();
+            this.loadLiveScreen();
+          }
+          if(this.platform == 'iOS'){
+            this.isFreeze = true;
+          }
+
     console.log(this.deviceId)}
     else
     {  if (ret.serial === ""){
         alert("未找到本地连接设备");}
        else{alert(ret.serial+"初始化设备失败");}
         }
-    })},
+    }.bind(this))},//todo:bind(this)
 
     checkVersion: function () {
       var self = this;
@@ -207,13 +238,23 @@ new Vue({
         },
       })
         .then(function (ret) {
-          console.log(ret)
+          console.log(ret);
           if (ret.success){
           this.deviceId = ret.deviceId;}
           else {
           alert(this.deviceUrl+"连接失败，请检查设备");
           return
           }
+          if(ret.socket_url && this.platform == 'Android'){
+            this.socket_url = ret.socket_url;
+          }
+          if(this.platform == 'iOS'){
+            this.isFreeze = true;
+          } else{
+            this.activeRemoteMouseControl();
+            this.loadLiveScreen();
+          }
+
         }.bind(this))
         .fail(function (ret) {
           this.showAjaxError(ret);
@@ -221,7 +262,7 @@ new Vue({
         }.bind(this))
     },
     keyevent: function (meta) {
-      var code = 'd.press("' + meta + '")'
+      var code = 'd.press("' + meta + '")';
       if (this.platform != 'Android' && meta == 'home') {
         code = 'd.home()'
       }
@@ -229,12 +270,11 @@ new Vue({
         .then(function () {
           return this.codeInsert(code);
         }.bind(this))
-        .then(this.delayReload)
     },
     sourceToJstree: function (source) {
-      var n = {}
+      var n = {};
       n.id = source.id;
-      n.text = source.type || source.className
+      n.text = source.type || source.className;
       if (source.name) {
         n.text += " - " + source.name;
       }
@@ -325,7 +365,7 @@ new Vue({
         .on("dehover_node.jstree", function () {
           self.nodeHovered = null;
           self.drawRefresh()
-        })
+        });
       $("#jstree-search").on('propertychange input', function (e) {
         var ret = $jstree.jstree(true).search($(this).val());
       })
@@ -437,10 +477,29 @@ new Vue({
         })
       }
     },
-    delayReload: function (msec) {
-      setTimeout(this.screenDumpUI, msec || 1000);
+
+    //todo:dumpUI
+    dumpUI: function () {
+      if(this.isFreeze == false){
+        this.screenDumpUIJstree();
+      } else {
+        this.screenDumpUI();
+      }
     },
-    //todo:reaload
+    screenDumpUIJstree: function () {
+      var self = this;
+      this.loading = true;
+      this.canvasStyle.opacity = 0.5;
+      return $.getJSON(LOCAL_URL + 'api/v1/devices/' + encodeURIComponent(self.deviceId || '-') + '/hierarchy')
+        .done(function (source) {
+          localStorage.setItem('windowHierarchy', JSON.stringify(source));
+          self.drawAllNodeFromSource(source);
+        })
+        .fail(function (ret) {
+          self.showAjaxError(ret);
+        })
+    },
+    //todo:动态解析
     screenDumpUI: function () {
       var self = this;
       this.loading = true;
@@ -449,6 +508,10 @@ new Vue({
       alert("无可用设备，请先连接手机")
       this.loading = false
       return}
+      if(this.isFreeze){
+        this.activeRemoteMouseControl();
+        this.loadLiveScreen();
+        this.isFreeze = false;}
       return this.screenRefresh()
         .fail(function (ret) {
           self.showAjaxError(ret);
@@ -527,13 +590,21 @@ new Vue({
       img.src = url;
       return dtd;
     },
+    //todo:实时同屏
     loadLiveScreen: function () {
       var self = this;
       var BLANK_IMG =
-        'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
-      var protocol = location.protocol == "http:" ? "ws://" : "wss://"
-      var ws = new WebSocket('ws://10.240.184.233:9002');
-      var canvas = document.getElementById('bgCanvas')
+        'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+      var protocol = location.protocol == "http:" ? "ws://" : "wss://";
+
+      var port = "7912";
+      if(this.platform == 'Android'){
+          port = this.socket_url.split(":")[1] ? this.socket_url.split(":")[1] : "7912";
+      }
+      var ip = this.socket_url.split(":")[0];
+      var ws = this.ws = new WebSocket('ws://' + ip + ':' + port + '/minicap');
+
+      var canvas = document.getElementById('bgCanvas');
       var ctx = canvas.getContext('2d');
       var lastScreenSize = {
         screen: {},
@@ -585,10 +656,36 @@ new Vue({
         }
         var url = URL.createObjectURL(blob)
         img.src = url;
+
+        if (/^rotation/.test(message.data)) {
+            self.rotation = parseInt(message.data.substr('rotation '.length), 10);
+        }
       }
 
       ws.onclose = function (ev) {
         console.log("screen websocket closed")
+      }
+    },
+
+    //todo:静态解析
+    freezeHandler: function(){
+      if(this.wsControl == null || this.platform == 'iOS'){
+        this.screenDumpUI();
+        return
+      }
+      if(this.isFreeze){
+        this.activeRemoteMouseControl();
+        this.loadLiveScreen();
+        this.isFreeze = false;
+      } else {
+        if(this.ws){
+          this.ws.close();
+        }
+        if(this.wsControl){
+          this.wsControl.close();
+        }
+        this.screenDumpUI();
+        this.isFreeze = true;
       }
     },
     codeRunDebugCode: function (code) {
@@ -672,16 +769,16 @@ new Vue({
       this.loading = true;
       this.codeInsert(code);
       this.codeRunDebugCode(code)
-        .then(this.delayReload)
     },
     doClear: function () {
       var code = 'd.clear_text()'
       this.codeRunDebugCode(code)
-        .then(this.delayReload)
         .then(function () {
           return this.codeInsert(code);
         }.bind(this))
     },
+
+    //todo:点击，loading=false，screenshot
     doTap: function (node) {
       var self = this;
       var code = this.generateNodeSelectorCode(node);
@@ -691,18 +788,19 @@ new Vue({
 
       this.loading = true;
       this.codeRunDebugCode(code)
-        .then(function () {
-          self.delayReload();
-        })
+        // .then(function () {
+        //   self.delayReload();
+        // })
         .fail(function () {
           self.loading = false;
-        })
+        }).done(function(){
+        self.loading = false})
+      this.screenDumpUI()
     },
     doPositionTap: function (x, y) {
       var code = 'd.click(' + x + ', ' + y + ')'
       this.codeInsert(code);
       this.codeRunDebugCode(code)
-        .then(this.delayReload)
     },
     generateNodeSelectorParams: function (node) {
       var self = this;
@@ -765,7 +863,7 @@ new Vue({
       jstree.settings.core.data = jstreeData;
       jstree.refresh();
 
-      var nodeMaps = this.originNodeMaps = {}
+      var nodeMaps = this.originNodeMaps = {};
 
       function sourceToNodes(source) {
         var node = Object.assign({}, source, { children: undefined });
@@ -778,13 +876,13 @@ new Vue({
         }
         return nodes;
       }
-      this.originNodes = sourceToNodes(source) //ret.nodes;
+      this.originNodes = sourceToNodes(source); //ret.nodes;
       this.drawAllNode();
       this.loading = false;
       this.canvasStyle.opacity = 1.0;
     },
     drawRefresh: function () {
-      this.drawAllNode()
+      this.drawAllNode();
       if (this.nodeHovered) {
         this.drawNode(this.nodeHovered, "blue")
       }
@@ -842,86 +940,38 @@ new Vue({
       })
       activeNodes.forEach(function (node) {
         self.drawNode(node, "blue", true)
-      })
+      });
       self.drawNode(self.nodeHovered, "blue");
     },
-    activeMouseControl: function () {
+
+    //todo:远程控制00000
+    activeLocalUIMouseControl: function () {
       var self = this;
       var element = this.canvas.fg;
 
       var screen = {
         bounds: {}
-      }
+      };
 
       function calculateBounds() {
         var el = element;
-        screen.bounds.w = el.offsetWidth
-        screen.bounds.h = el.offsetHeight
-        screen.bounds.x = 0
-        screen.bounds.y = 0
+        screen.bounds.w = el.offsetWidth;
+        screen.bounds.h = el.offsetHeight;
+        screen.bounds.x = 0;
+        screen.bounds.y = 0;
 
         while (el.offsetParent) {
-          screen.bounds.x += el.offsetLeft
-          screen.bounds.y += el.offsetTop
+          screen.bounds.x += el.offsetLeft;
+          screen.bounds.y += el.offsetTop;
           el = el.offsetParent
         }
       }
 
       function activeFinger(index, x, y, pressure) {
-        var scale = 0.5 + pressure
+        var scale = 0.5 + pressure;
         $(".finger-" + index)
           .addClass("active")
           .css("transform", 'translate3d(' + x + 'px,' + y + 'px,0)')
-      }
-
-      function deactiveFinger(index) {
-        $(".finger-" + index).removeClass("active")
-      }
-
-      function mouseMoveListener(event) {
-        var e = event
-        if (e.originalEvent) {
-          e = e.originalEvent
-        }
-        // Skip secondary click
-        if (e.which === 3) {
-          return
-        }
-        e.preventDefault()
-
-        var pressure = 0.5
-        activeFinger(0, e.pageX, e.pageY, pressure);
-        // that.touchMove(0, x / screen.bounds.w, y / screen.bounds.h, pressure);
-      }
-
-      function mouseUpListener(event) {
-        var e = event
-        if (e.originalEvent) {
-          e = e.originalEvent
-        }
-        // Skip secondary click
-        if (e.which === 3) {
-          return
-        }
-        e.preventDefault()
-
-        var pos = coord(e);
-        // change precision
-        pos.px = Math.floor(pos.px * 1000) / 1000;
-        pos.py = Math.floor(pos.py * 1000) / 1000;
-        pos.x = Math.floor(pos.px * element.width);
-        pos.y = Math.floor(pos.py * element.height);
-        self.cursor = pos;
-        markPosition(self.cursor)
-
-        stopMousing()
-      }
-
-      function stopMousing() {
-        element.removeEventListener('mousemove', mouseMoveListener);
-        element.addEventListener('mousemove', mouseHoverListener);
-        document.removeEventListener('mouseup', mouseUpListener);
-        deactiveFinger(0);
       }
 
       function coord(event) {
@@ -929,9 +979,9 @@ new Vue({
         if (e.originalEvent) {
           e = e.originalEvent
         }
-        calculateBounds()
-        var x = e.pageX - screen.bounds.x
-        var y = e.pageY - screen.bounds.y
+        calculateBounds();
+        var x = e.pageX - screen.bounds.x;
+        var y = e.pageY - screen.bounds.y;
         var px = x / screen.bounds.w;
         var py = y / screen.bounds.h;
         return {
@@ -942,27 +992,38 @@ new Vue({
         }
       }
 
+      function markPosition(pos) {
+        var ctx = self.canvas.fg.getContext("2d");
+        ctx.fillStyle = '#ff0000'; // red
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 12, 0, 2 * Math.PI);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "#fff"; // white
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 8, 0, 2 * Math.PI);
+        ctx.closePath();
+        ctx.fill();
+      }
+
       function mouseHoverListener(event) {
         var e = event;
         if (e.originalEvent) {
           e = e.originalEvent
         }
-        // Skip secondary click
-        if (e.which === 3) {
-          return
-        }
-        e.preventDefault()
+        e.preventDefault();
         // startMousing()
 
-        var x = e.pageX - screen.bounds.x
-        var y = e.pageY - screen.bounds.y
+        var x = e.pageX - screen.bounds.x;
+        var y = e.pageY - screen.bounds.y;
         var pos = coord(event);
 
-        self.drawAllNode()
+        self.drawAllNode();
+        self.drawHoverNode(pos);
         if (self.nodeSelected) {
           self.drawNode(self.nodeSelected, "red");
         }
-        self.drawHoverNode(pos);
         if (self.cursor.px) {
           markPosition(self.cursor)
         }
@@ -973,19 +1034,15 @@ new Vue({
         if (e.originalEvent) {
           e = e.originalEvent
         }
-        // Skip secondary click
-        if (e.which === 3) {
-          return
-        }
-        e.preventDefault()
+        e.preventDefault();
 
-        fakePinch = e.altKey
-        calculateBounds()
+        fakePinch = e.altKey;
+        calculateBounds();
         // startMousing()
 
-        var x = e.pageX - screen.bounds.x
-        var y = e.pageY - screen.bounds.y
-        var pressure = 0.5
+        var x = e.pageX - screen.bounds.x;
+        var y = e.pageY - screen.bounds.y;
+        var pressure = 0.5;
         activeFinger(0, e.pageX, e.pageY, pressure);
 
         if (self.nodeHovered) {
@@ -1009,28 +1066,161 @@ new Vue({
         // self.touchDown(0, x / screen.bounds.w, y / screen.bounds.h, pressure);
 
         element.removeEventListener('mousemove', mouseHoverListener);
-        element.addEventListener('mousemove', mouseMoveListener);
         document.addEventListener('mouseup', mouseUpListener);
       }
 
-      function markPosition(pos) {
-        var ctx = self.canvas.fg.getContext("2d");
-        ctx.fillStyle = '#ff0000'; // red
-        ctx.beginPath()
-        ctx.arc(pos.x, pos.y, 12, 0, 2 * Math.PI)
-        ctx.closePath()
-        ctx.fill()
+      function mouseUpListener(event) {
+        var e = event;
+        if (e.originalEvent) {
+          e = e.originalEvent
+        }
+        e.preventDefault();
 
-        ctx.fillStyle = "#fff"; // white
-        ctx.beginPath()
-        ctx.arc(pos.x, pos.y, 8, 0, 2 * Math.PI)
-        ctx.closePath()
-        ctx.fill();
+        var pos = coord(e);
+        // change precision
+        pos.px = Math.floor(pos.px * 1000) / 1000;
+        pos.py = Math.floor(pos.py * 1000) / 1000;
+        pos.x = Math.floor(pos.px * element.width);
+        pos.y = Math.floor(pos.py * element.height);
+        self.cursor = pos;
+        markPosition(self.cursor);
+
+        stopMousing()
+      }
+
+      function stopMousing() {
+        document.removeEventListener('mouseup', mouseUpListener);
+        element.addEventListener('mousemove', mouseHoverListener);
+        deactiveFinger(0);
+      }
+
+      function deactiveFinger(index) {
+        $(".finger-" + index).removeClass("active")
       }
 
       /* bind listeners */
       element.addEventListener('mousedown', mouseDownListener);
       element.addEventListener('mousemove', mouseHoverListener);
+    },
+
+    //todo：远程控制
+    activeRemoteMouseControl: function () {
+      /**
+       * TOUCH HANDLING
+       */
+      var self = this;
+      var element = this.canvas.fg;
+
+      var screen = {
+        bounds: {}
+      };
+
+      var port = "7912";
+      if(this.platform == 'Android'){
+          port = this.socket_url.split(":")[1] ? this.socket_url.split(":")[1] : "7912";
+      }
+      var ip = this.socket_url.split(":")[0];
+      var ws = this.wsControl = new WebSocket('ws://' + ip + ':' + port + '/minitouch');
+      ws.onerror = function (ev) {
+        console.log("minitouch websocket error:", ev)
+      };
+      ws.onmessage = function (ev) {
+        console.log("minitouch websocket receive message:", ev.data);
+      };
+      ws.onclose = function () {
+        console.log("minitouch websocket closed");
+        element.removeEventListener('mousedown', mouseDownListener);
+      };
+      var control =  MiniTouch.createNew(ws);
+
+      function calculateBounds() {
+        var el = element;
+        screen.bounds.w = el.offsetWidth;
+        screen.bounds.h = el.offsetHeight;
+        screen.bounds.x = 0;
+        screen.bounds.y = 0;
+
+        while (el.offsetParent) {
+          screen.bounds.x += el.offsetLeft;
+          screen.bounds.y += el.offsetTop;
+          el = el.offsetParent
+        }
+      }
+
+      function activeFinger(index, x, y, pressure) {
+        var scale = 0.5 + pressure;
+        $(".finger-" + index)
+          .addClass("active")
+          .css("transform", 'translate3d(' + x + 'px,' + y + 'px,0)')
+      }
+
+      function mouseDownListener(event) {
+        var e = event;
+        if (e.originalEvent) {
+          e = e.originalEvent
+        }
+        // Skip secondary click
+        if (e.which === 3 || e.which === 2) {
+          return
+        }
+        e.preventDefault();
+
+        fakePinch = e.altKey;
+        calculateBounds();
+
+        var x = e.pageX - screen.bounds.x;
+        var y = e.pageY - screen.bounds.y;
+        var pressure = 0.5;
+        activeFinger(0, e.pageX, e.pageY, pressure);
+
+        var scaled = coords(screen.bounds.w, screen.bounds.h, x, y, self.rotation);
+        control.touchDown(0, scaled.xP, scaled.yP, pressure);
+        control.touchCommit();
+
+        element.addEventListener('mousemove', mouseMoveListener);
+        document.addEventListener('mouseup', mouseUpListener);
+      }
+
+      function mouseMoveListener(event) {
+        var e = event;
+        if (e.originalEvent) {
+          e = e.originalEvent
+        }
+        e.preventDefault();
+
+        var pressure = 0.5;
+        activeFinger(0, e.pageX, e.pageY, pressure);
+        var x = e.pageX - screen.bounds.x;
+        var y = e.pageY - screen.bounds.y;
+        var scaled = coords(screen.bounds.w, screen.bounds.h, x, y, self.rotation);
+        control.touchMove(0, scaled.xP, scaled.yP, pressure);
+        control.touchCommit();
+      }
+
+      function mouseUpListener(event) {
+        var e = event;
+        if (e.originalEvent) {
+          e = e.originalEvent
+        }
+        e.preventDefault();
+
+        control.touchUp(0);
+        control.touchCommit();
+        stopMousing()
+      }
+
+      function stopMousing() {
+        element.removeEventListener('mousemove', mouseMoveListener);
+        document.removeEventListener('mouseup', mouseUpListener);
+        deactiveFinger(0);
+      }
+
+      function deactiveFinger(index) {
+        $(".finger-" + index).removeClass("active")
+      }
+
+      /* bind listeners */
+      element.addEventListener('mousedown', mouseDownListener);
     }
   }
-})
+});
